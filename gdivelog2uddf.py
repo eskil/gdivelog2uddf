@@ -29,6 +29,26 @@ SI_INF = timedelta(days=5)
 def celcius_to_kelvin(celcius):
 	return celcius + 273.15;
 
+def xml_add(top, node, tag, text=None, subfields={}, attr={}):
+	element = top.createElement(tag)
+	
+	for k, v in attr.iteritems():
+		element.setAttribute(k, '%r' % v)
+		
+	if text is not None:
+		if isinstance(text, str):
+			textelement = top.createTextNode(text)
+		else:
+			textelement = top.createTextNode('%r' % text)
+		element.appendChild(textelement)
+
+	node.appendChild(element)		
+
+	for k, v in subfields.iteritems():
+		xml_add(top, element, k, text=v)
+
+	return element
+
 
 class GDiveLog(object):
 	""" """
@@ -128,6 +148,10 @@ class GDiveLog(object):
 				result.append(site.site_name)
 			return result
 
+		def site_name(self, siteid):
+			site = self.session.query(GDiveLog.DB.Site).filter(GDiveLog.DB.Site.site_id == siteid).one()
+			return ' / '.join(self.site_name_list(site))
+
 	class UDDF(object):
 
 
@@ -140,30 +164,13 @@ class GDiveLog(object):
 																	'version': VERSION})
 			manufacturer = self._add(generator, 'manufacturer', subfields={'name': 'Eskil Heyn Olsen'})
 			contact = self._add(manufacturer, 'contact')
-			self._add(contact, 'homepage', 'http://github.com/...')
+			self._add(contact, 'homepage', 'http://github.com/eskilolsen/gdivelog2uddf')
 			self._add(contact, 'homepage', 'http://eskil.org/')
 			self._add(generator, 'datetime', datetime.now().isoformat())
 
 
 		def _add(self, node, tag, text=None, subfields={}, attr={}):
-			element = self.top.createElement(tag)
-
-			for k, v in attr.iteritems():
-				element.setAttribute(k, '%r' % v)
-
-			if text:
-				if isinstance(text, str):
-					textelement = self.top.createTextNode(text)
-				else:
-					textelement = self.top.createTextNode('%r' % text)
-				element.appendChild(textelement)
-			node.appendChild(element)		
-
-			for k, v in subfields.iteritems():
-				self._add(element, k, text=v)
-
-			return element
-
+			return xml_add(self.top, node, tag, text=text, subfields=subfields, attr=attr)
 
 		def _add_text_paragraphs(self, node, tag, text):
 			if not text:
@@ -219,10 +226,10 @@ class GDiveLog(object):
 				self._add_text_paragraphs(dive_group, 'notes', dive.dive_notes)
 
 				if dive.site_id > 0:
-					self._add(dive_group, 'link', text='dive_site_%d' % dive.site_id)
+					self._add(dive_group, 'link', attr={'ref': 'dive_site_%d' % dive.site_id})
 
 				for buddy in divelog.dive_buddies(dive.dive_id):
-					self._add(dive_group, 'link', text='dive_buddy_%d' % buddy.buddy_id)
+					self._add(dive_group, 'link', attr={'ref': 'dive_buddy_%d' % buddy.buddy_id})
 
 				sample_group = self._add(dive_group, 'samples')
 				for sample in divelog.samples(dive.dive_number):
@@ -234,8 +241,65 @@ class GDiveLog(object):
 
 				previous_divetime = divetime
 
+	class UDCF(object):
+
+
+		def __init__(self):
+			self.top = xml.dom.minidom.Document()	
+			# Put in the <generator> header.
+			self.doc = self._add(self.top, 'profile', attr={'udcf': 1})
+			self._add(self.doc, 'units', text='Metric')
+			self._add(self.doc, 'device', subfields={'vendor': NAME, 'model': 'udcf', 'version': VERSION})
+
+
+		def _add(self, node, tag, text=None, subfields={}, attr={}):
+			return xml_add(self.top, node, tag, text=text, subfields=subfields, attr=attr)
+
+		def add_dives(self, divelog, args):
+			previous_divetime = datetime.min
+			group = self._add(self.doc, 'repgroup')
+
+			for dive in divelog.dives():
+				# Compute the SI and start a new group if INF
+				divetime = datetime.strptime(dive.dive_datetime, '%Y-%m-%d %H:%M:%S')
+				surfaceinterval = divetime - previous_divetime			
+				dive_group = self._add(group, 'dive')
+
+				self._add(dive_group, 'date', subfields={'year': divetime.year, 'month': divetime.month, 'day': divetime.day})
+				self._add(dive_group, 'time', subfields={'hour': divetime.hour, 'minute': divetime.minute})
+
+				if surfaceinterval > SI_INF:
+					self._add(dive_group, 'surface_interval', subfields={'infinity': None})
+				else:
+					self._add(dive_group, 'surface_interval', subfields={'passedtime': surfaceinterval.days * 24 * 60 * 60 + surfaceinterval.seconds}) # .total_seconds in 2.7...
+
+				if celcius_to_kelvin(dive.dive_mintemp) > 0:
+					self._add(dive_group, 'temperature', celcius_to_kelvin(dive.dive_mintemp))
+				self._add(dive_group, 'density', text=1030.0)
+				self._add(dive_group, 'altitude', text=0.0)
+
+				gases_group = self._add(dive_group, 'gases')
+				mix_group = self._add(gases_group, 'mix', subfields={'mixname': 1, 'o2': 0.21, 'n2': 0.79, 'he': 0.0})
+				tank_group = self._add(mix_group, 'tank', subfields={'tankvolume': 10, 'pstart': 250, 'pend': 30})
+				
+
+				if dive.site_id > 0:
+					self._add(dive_group, 'place', text=divelog.site_name(dive.site_id))
+
+				self._add(dive_group, 'timedepthmode')
+				sample_group = self._add(dive_group, 'samples', subfields={'switch': 1})
+				self._add(sample_group, 't', text=0)
+				self._add(sample_group, 'd', text=0)
+				for sample in divelog.samples(dive.dive_number):
+					self._add(sample_group, 't', text=sample.profile_time)
+					self._add(sample_group, 'd', text=sample.profile_depth)
+				self._add(sample_group, 't')
+				self._add(sample_group, 'd', text=0)
+
+				previous_divetime = divetime
+
 	@classmethod
-	def db_to_uddf(cls, options):
+	def db_to_uddf(cls, options, args):
 		db = GDiveLog.DB(options)	
 		uddf = GDiveLog.UDDF()
 		uddf.add_divers(db)
@@ -243,8 +307,20 @@ class GDiveLog(object):
 		uddf.add_dives(db)
 		return uddf
 
+
+	@classmethod
+	def db_to_udcf(cls, options, args):
+		db = GDiveLog.DB(options)	
+		udcf = GDiveLog.UDCF()
+		udcf.add_dives(db, args)
+		return udcf
+
 def main(options, args):
-	xml = GDiveLog.db_to_uddf(options)
+	if options.udcf:
+		xml = GDiveLog.db_to_udcf(options, args)
+	else:
+		xml = GDiveLog.db_to_uddf(options, args)
+
 	if options.prettyprint:
 		print xml.doc.toprettyxml()
 	else:
@@ -258,5 +334,7 @@ if __name__ == '__main__':
 					  help='pretty print xml')
 	parser.add_option('-v', '--verbose', action='store_true', dest='verbose', default=False, 
 					  help='print status messages to stdout')	
+	parser.add_option('-u', '--udcf', action='store_true', dest='udcf', default=False,
+					  help='dump dives as udcf')
 	(options, args) = parser.parse_args()
 	main(options, args)
