@@ -178,8 +178,13 @@ class GDiveLog(object):
 			buddy_id = Column(Integer, primary_key=True)
 
 
-		def dives(self):
-			for dive in self.session.query(GDiveLog.DB.Dive).order_by(GDiveLog.DB.Dive.dive_number.asc()):
+		def dives(self, numbers=[]):			
+			if numbers == []:
+				query = self.session.query(GDiveLog.DB.Dive).order_by(GDiveLog.DB.Dive.dive_number.asc())
+			else:
+				query = self.session.query(GDiveLog.DB.Dive).filter(GDiveLog.DB.Dive.dive_number == 124).order_by(GDiveLog.DB.Dive.dive_number.asc())
+				
+			for dive in query:
 				yield dive
 
 
@@ -188,13 +193,13 @@ class GDiveLog(object):
 				yield buddy
 
 
-		def dive_buddies(self, divenumber):
-			for buddy in self.session.query(GDiveLog.DB.DiveBuddy).filter(GDiveLog.DB.DiveBuddy.dive_id == divenumber):
+		def dive_buddies(self, diveid):
+			for buddy in self.session.query(GDiveLog.DB.DiveBuddy).filter(GDiveLog.DB.DiveBuddy.dive_id == diveid):
 				yield buddy
 
 
-		def samples(self, divenumber):
-			for sample in self.session.query(GDiveLog.DB.Profile).filter(GDiveLog.DB.Profile.dive_id == divenumber).order_by(GDiveLog.DB.Profile.profile_time.asc()):
+		def samples(self, diveid):
+			for sample in self.session.query(GDiveLog.DB.Profile).filter(GDiveLog.DB.Profile.dive_id == diveid).order_by(GDiveLog.DB.Profile.profile_time.asc()):
 				yield sample
 
 
@@ -299,7 +304,7 @@ class GDiveLog(object):
 					self._add(dive_group, 'link', attr={'ref': 'dive_buddy_%d' % buddy.buddy_id})
 
 				sample_group = self._add(dive_group, 'samples')
-				for sample in divelog.samples(dive.dive_number):
+				for sample in divelog.samples(dive.dive_id):
 					waypoint = self._add(sample_group, 'waypoint', subfields={'divetime': sample.profile_time,
 																			  'depth': sample.profile_depth})
 					k = celcius_to_kelvin(sample.profile_temperature)
@@ -332,7 +337,7 @@ class GDiveLog(object):
 			previous_divetime = datetime.min
 			group = self._add(self.doc, 'repgroup')
 
-			for dive in divelog.dives():
+			for dive in divelog.dives(numbers=args):
 				# Compute the SI and start a new group if INF
 				divetime = datetime.strptime(dive.dive_datetime, '%Y-%m-%d %H:%M:%S')
 				surfaceinterval = divetime - previous_divetime			
@@ -366,7 +371,7 @@ class GDiveLog(object):
 				sample_group = self._add(dive_group, 'samples', subfields={'switch': 1})
 				self._add(sample_group, 't', text=0)
 				self._add(sample_group, 'd', text=0)
-				for sample in divelog.samples(dive.dive_number):
+				for sample in divelog.samples(dive.dive_id):
 					self._add(sample_group, 't', text=sample.profile_time)
 					self._add(sample_group, 'd', text=sample.profile_depth)
 				self._add(sample_group, 't')
