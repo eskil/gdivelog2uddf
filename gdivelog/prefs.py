@@ -61,19 +61,28 @@ class GDiveLogPreferences(object):
         preferences = open(options.gdivelog_preferences, 'rb')
         data = preferences.read()
 
-        # Ideally we'd do this... but the padding seems to be off.
-        #(depth_unit, _, _, _, _, _, # units
-        # _, _, _, _, # color...
-        # _, _, _, _, # color...
-        # _, _, _, _, # color...
-        # _, _, _, _, # color...
-        # _, _, _, _, # color...
-        # _, _, _, _, # color...
-        # _, _, _,
-        # site_name_seperator,
-        # _, _) = struct.unpack('=6cl3hl3hl3hl3hl3hl3h2id4sil', data)
+        if False:
+            # Ideally we'd do this... but the padding seems to be off.
+            try:
+                (depth_unit, _, _, _, _, _, # units
+                 _, _, _, _, # color...
+                 _, _, _, _, # color...
+                 _, _, _, _, # color...
+                 _, _, _, _, # color...
+                 _, _, _, _, # color...
+                 _, _, _, _, # color...
+                 _, _, _,
+                 site_name_seperator,
+                 _, _,
+                 _ # pad to lines of 16b
+                 ) = struct.unpack('6cl3hl3hl3hl3hl3hl3h2id4sil8c', data)
+            except struct.error, e:
+                print 'length of data = %d' % (len(data),)
+                raise e
+        else:
+            # So instead I do this. This is particularly
+            # assy since padding can affect 0140.
+            (self.depth_unit, _, _, _, _, _) = struct.unpack('@6c', data[0:6])
+            self.site_name_seperator = ''.join(struct.unpack('@4c', data[0140:0144])).split('\0')[0]
 
-        # So instead I do this. This is particularly
-        # assy since padding can affect 0140.
-        (self.depth_unit, _, _, _, _, _) = struct.unpack('@6c', data[0:6])
-        self.site_name_seperator = ''.join(struct.unpack('@4c', data[0140:0144])).replace('\0', '')
+        self.site_name_seperator = self.site_name_seperator.split('\0')[0]
