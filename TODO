@@ -1,12 +1,14 @@
 
   * UDCF
     * Read 'Preferences' and correctly emit Metric/Imperial for UDCF
-    * Fix strings to not have u'...'
+       * take imperial and site sep as args in exchange for NOT reading preferences
     * Temperature in appropriate unit, not Kelvin it seems...
     * Some dives are coming out with no profile on divelogs.de.
     * Some dives are coming out with no site on divelogs.de.
 
   * UDDF
-    * Fix strings to not have u'...'
+
+  * 2.7
+    * use argparse instead of optparse
 
 Not having a good tool to import is making it tricky to get UDDF import fleshed out.
