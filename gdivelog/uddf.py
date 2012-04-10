@@ -60,6 +60,9 @@ class GDiveLogUDDF(object):
         divers = self._add(self.doc, 'diver')
         owner = self._add(divers, 'owner', attr={'id': 'diver_id_0'})
         self._add(owner, 'personal', subfields={'firstname': 'Your First Name', 'lastname': 'Your Last Name'})
+        equipment_group = self._add(owner, 'equipment')
+        for equipment in self.db.equipment():
+            self._add(equipment_group, 'variouspieces', subfields={'name': equipment.equipment_name, 'notes': equipment.equipment_notes}, attr={'id': 'equipment_id_%d' % equipment.equipment_id})
         for buddy in self.db.buddies():
             buddy_group = self._add(divers, 'buddy', attr={'id': 'dive_buddy_%d' % buddy.buddy_id})
             names = buddy.buddy_name.split(' ')

@@ -78,9 +78,48 @@ class GDiveLogDB(object):
 
 
     class DiveBuddy(Base):
+        # Relate dives to buddies
         __tablename__ = 'Dive_Buddy'
-        dive_id = Column(Integer, primary_key=True)
-        buddy_id = Column(Integer, primary_key=True)
+        dive_id = Column(Integer, ForeignKey('Dive.dive_id'), primary_key=True)
+        buddy_id = Column(Integer, ForeignKey('Buddy.buddy_id'), primary_key=True)
+
+
+    class Equipment(Base):
+        __tablename__ = 'Equipment'
+        equipment_id = Column(Integer, primary_key=True)
+        equipment_name = Column(String)
+        equipment_notes = Column(String)
+
+
+    class DiveEquipment(Base):
+        # Relate dives to equipment
+        __tablename__ = 'Dive_Equipment'
+        equipment_id = Column(Integer, ForeignKey('Equipment.equipment_id'), primary_key=True)
+        dive_id = Column(Integer, ForeignKey('Dive.dive_id'), primary_key=True)
+
+
+    class Tank(Base):
+        __tablename__ = 'Tank'
+        tank_id = Column(Integer, primary_key=True)
+        tank_name = Column(String)
+        tank_volume = Column(Float)
+        tank_wp = Column(Float)
+        tank_notes = Column(String)
+
+
+    class DiveTank(Base):
+        # Relate dives to tanks and their usage
+        __tablename__ = 'Dive_Tank'
+        dive_tank_id = Column(Integer, primary_key=True)
+        dive_id = Column(Integer, ForeignKey('Dive.dive_id'))
+        tank_id = Column(Integer, ForeignKey('Tank.tank_id'))
+        dive_tank_avg_depth = Column(Float)
+        dive_tank_O2 = Column(Float)
+        dive_tank_He = Column(Float)
+        dive_tank_stime = Column(Integer)
+        dive_tank_etime = Column(Integer)
+        dive_tank_spressure = Column(Float)
+        dive_tank_epressure = Column(Float)
 
 
     def dives(self, numbers=[]):
@@ -95,6 +134,13 @@ class GDiveLogDB(object):
         for dive in query:
             yield dive
 
+    def equipment(self):
+        """
+        Generator to iterate across equipment
+        """
+        query = self.session.query(GDiveLogDB.Equipment)
+        for equipment in query:
+            yield equipment
 
     def buddies(self, diveid=None):
         """
