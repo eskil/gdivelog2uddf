@@ -13,6 +13,24 @@ __version__ = "1.0"
 __status__ = "Production"
 
 
+def _dive_ref(dive_id):
+    return 'dive_%d' % dive_id
+
+def _site_ref(site_id):
+    return 'site_%d' % site_id
+
+def _buddy_ref(buddy_id):
+    return 'buddy_%d' % buddy_id
+
+def _equipment_ref(equipment_id):
+    return 'eq_%d' % equipment_id
+
+def _trip_ref(trip_id):
+    return 'trip_%d' % trip_id
+
+def _repgroup_ref(repgroup_id):
+    return 'rg_%d' % repgroup_id
+
 class GDiveLogUDDF(object):
     """
     Represent a GDivelog database as a UDDF document.
@@ -62,9 +80,9 @@ class GDiveLogUDDF(object):
         self._add(owner, 'personal', subfields={'firstname': 'Your First Name', 'lastname': 'Your Last Name'})
         equipment_group = self._add(owner, 'equipment')
         for equipment in self.db.equipment():
-            self._add(equipment_group, 'variouspieces', subfields={'name': equipment.equipment_name, 'notes': equipment.equipment_notes}, attr={'id': 'equipment_id_%d' % equipment.equipment_id})
+            self._add(equipment_group, 'variouspieces', subfields={'name': equipment.equipment_name, 'notes': equipment.equipment_notes}, attr={'id': _equipment_ref(equipment.equipment_id)})
         for buddy in self.db.buddies():
-            buddy_group = self._add(divers, 'buddy', attr={'id': 'dive_buddy_%d' % buddy.buddy_id})
+            buddy_group = self._add(divers, 'buddy', attr={'id': _buddy_ref(buddy.buddy_id)})
             names = buddy.buddy_name.split(' ')
             self._add(buddy_group, 'personal', subfields={'firstname': names[0], 'lastname': ' '.join(names[1:])})
 
@@ -79,7 +97,7 @@ class GDiveLogUDDF(object):
         """
         divesites = self._add(self.doc, 'divesite')
         for site in self.db.sites():
-            site_group = self._add(divesites, 'site', subfields={'name': self.db.site_name(site.site_id)}, attr={'id': 'dive_site_%d' % site.site_id})
+            site_group = self._add(divesites, 'site', subfields={'name': self.db.site_name(site.site_id)}, attr={'id': _site_ref(site.site_id)})
 
 
     def add_divetrips(self):
@@ -99,14 +117,14 @@ class GDiveLogUDDF(object):
             surfaceinterval = divetime - previous_divetime
 
             if surfaceinterval > timedelta(days=self.options.trip_si_threshold):
-                trip = self._add(divetrips, 'trip', attr={'id': 'trip_%d' % trip_counter})
+                trip = self._add(divetrips, 'trip', attr={'id': _trip_ref(trip_counter)})
                 trip_counter += 1
                 self._add(trip, 'name', self.db.site_name(dive.site_id))
                 trippart = self._add(trip, 'trippart')
                 relateddives = self._add(trippart, 'relateddives')
                 # FIXME: http://www.streit.cc/extern/uddf_v300/en/trippart.html others fields to add ?
 
-            self._add(relateddives, 'link', attr={'ref': 'dive_%d' % dive.dive_id})
+            self._add(relateddives, 'link', attr={'ref': _dive_ref(dive.dive_id)})
             previous_divetime = divetime
 
         # Add 1 initial trip.
@@ -141,7 +159,7 @@ class GDiveLogUDDF(object):
         This adds a single <dive> tag to the <repetitiongroup> given.
         """
         divetime = datetime.strptime(dive.dive_datetime, '%Y-%m-%d %H:%M:%S')
-        dive_group = self._add(repititongroup, 'dive', attr={'id': 'dive_%d' % dive.dive_id})
+        dive_group = self._add(repititongroup, 'dive', attr={'id': _dive_ref(dive.dive_id)})
         self._add(dive_group, 'dive_number', text=dive.dive_number)
         self._add(dive_group, 'tripmembership')
         self._add(dive_group, 'datetime', divetime.isoformat())
@@ -162,11 +180,16 @@ class GDiveLogUDDF(object):
         # FIXME: need to add <tankdata>, see above...
 
         if dive.site_id > 0:
-            self._add(dive_group, 'link', attr={'ref': 'dive_site_%d' % dive.site_id})
+            self._add(dive_group, 'link', attr={'ref': _site_ref(dive.site_id)})
 
         for buddy in self.db.buddies(diveid=dive.dive_id):
-            self._add(dive_group, 'link', attr={'ref': 'dive_buddy_%d' % buddy.buddy_id})
+            self._add(dive_group, 'link', attr={'ref': _buddy_ref(buddy.buddy_id)})
 
+        equipment_group = self._add(dive_group, 'equipmentused')
+        if dive.dive_weight > 0.0:
+            self._add(equipment_group, 'leadquantity', dive.dive_weight)
+        for equipment in self.db.equipment(diveid=dive.dive_id):
+            self._add(equipment_group, 'link', attr={'ref': _equipment_ref(equipment.equipment_id)})
         sample_group = self._add(dive_group, 'samples')
         for sample in self.db.samples(dive.dive_id):
             waypoint = self._add(sample_group, 'waypoint', subfields={'divetime': sample.profile_time,
@@ -192,7 +215,7 @@ class GDiveLogUDDF(object):
             surfaceinterval = divetime - previous_divetime
 
             if surfaceinterval >= SI_INF:
-                repititongroup = self._add(profiledata, 'repetitiongroup', attr={'id': 'rg_%d' % repititiongroup_counter})
+                repititongroup = self._add(profiledata, 'repetitiongroup', attr={'id': _repgroup_ref(repititiongroup_counter)})
                 repititiongroup_counter += 1
 
             self.add_gasdefinitions(gasdefinitions, dive)

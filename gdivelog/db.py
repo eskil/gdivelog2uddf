@@ -134,11 +134,15 @@ class GDiveLogDB(object):
         for dive in query:
             yield dive
 
-    def equipment(self):
+    def equipment(self, diveid=None):
         """
         Generator to iterate across equipment
         """
-        query = self.session.query(GDiveLogDB.Equipment)
+        if diveid:
+            query = self.session.query(GDiveLogDB.DiveEquipment).filter(GDiveLogDB.DiveEquipment.dive_id == diveid)
+        else:
+            query = self.session.query(GDiveLogDB.Equipment)
+
         for equipment in query:
             yield equipment
 
