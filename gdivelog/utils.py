@@ -39,7 +39,10 @@ def xml_add(top, node, tag, text=None, subfields={}, attr={}):
     element = top.createElement(tag)
 
     for k, v in attr.iteritems():
-        element.setAttribute(k, '%r' % v)
+        if isinstance(v, basestring):
+            element.setAttribute(k, '%s' % v)
+        else:
+            element.setAttribute(k, '%r' % v)
 
     if text is not None:
         textelement = top.createTextNode('%s' % text)
