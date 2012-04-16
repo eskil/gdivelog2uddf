@@ -76,7 +76,7 @@ class GDiveLogUDDF(object):
         Add the divelog owner and all known buddies to the UDDF document.
         """
         divers = self._add(self.doc, 'diver')
-        owner = self._add(divers, 'owner', attr={'id': 'diver_id_0'})
+        owner = self._add(divers, 'owner', attr={'id': 'owner'})
         self._add(owner, 'personal', subfields={'firstname': 'Your First Name', 'lastname': 'Your Last Name'})
         equipment_group = self._add(owner, 'equipment')
         for equipment in self.db.equipment():

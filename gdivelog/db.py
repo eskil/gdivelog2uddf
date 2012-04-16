@@ -129,7 +129,7 @@ class GDiveLogDB(object):
         if numbers == []:
             query = self.session.query(GDiveLogDB.Dive).order_by(GDiveLogDB.Dive.dive_number.asc())
         else:
-            query = self.session.query(GDiveLogDB.Dive).filter(GDiveLogDB.Dive.dive_number == 124).order_by(GDiveLogDB.Dive.dive_number.asc())
+            query = self.session.query(GDiveLogDB.Dive).filter(GDiveLogDB.Dive.dive_number.in_(numbers)).order_by(GDiveLogDB.Dive.dive_number.asc())
 
         for dive in query:
             yield dive
