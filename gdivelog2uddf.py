@@ -70,9 +70,9 @@ def main(options, args):
         out = sys.stdout
 
     if options.prettyprint:
-        out.write(xml.doc.toprettyxml())
+        out.write(xml.doc.toprettyxml(encoding='utf-8'))
     else:
-        xml.doc.writexml(out)
+        out.write(xml.doc.toxml('utf-8'))
 
 
 if __name__ == '__main__':
