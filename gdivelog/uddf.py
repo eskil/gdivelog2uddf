@@ -79,8 +79,8 @@ class GDiveLogUDDF(object):
         self._add(owner, 'personal', subfields={'firstname': 'Your First Name', 'lastname': 'Your Last Name'})
         equipment_group = self._add(owner, 'equipment')
         for equipment in self.db.equipment():
-            self._add(equipment_group, 'variouspieces', subfields={'name': equipment.equipment_name}, attr={'id': _equipment_ref(equipment.equipment_id)})
-            self._add_text_paragraphs(equipment_group, 'notes', equipment.equipment_notes)
+            piece_group = self._add(equipment_group, 'variouspieces', subfields={'name': equipment.equipment_name}, attr={'id': _equipment_ref(equipment.equipment_id)})
+            self._add_text_paragraphs(piece_group, 'notes', equipment.equipment_notes)
         for buddy in self.db.buddies():
             buddy_group = self._add(divers, 'buddy', attr={'id': _buddy_ref(buddy.buddy_id)})
             names = buddy.buddy_name.split(' ')
