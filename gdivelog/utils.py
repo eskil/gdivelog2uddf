@@ -51,6 +51,11 @@ def xml_add(top, node, tag, text=None, subfields={}, attr={}):
     node.appendChild(element)
 
     for k, v in subfields.iteritems():
-        xml_add(top, element, k, text=v)
+        if isinstance(v, basestring):
+            xml_add(top, element, k, text='%s' % v)
+        elif isinstance(v, dict):
+            xml_add(top, element, k, subfields=v)
+        else:
+            xml_add(top, element, k, text='%r' % v)
 
     return element

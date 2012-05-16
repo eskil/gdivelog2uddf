@@ -45,8 +45,7 @@ class GDiveLogUDDF(object):
         # Put in the <generator> header.
         self.doc = self._add(self.top, 'uddf', attr={'version': '3.0.0',
                                                      'type': 'converter'})
-        generator = self._add(self.doc, 'generator', subfields={'name': NAME,
-                                                                'version': VERSION})
+        generator = self._add(self.doc, 'generator', subfields={'name': NAME, 'version': VERSION, 'type': 'logbook'})
         manufacturer = self._add(generator, 'manufacturer', subfields={'name': 'Eskil Heyn Olsen'})
         contact = self._add(manufacturer, 'contact')
         self._add(contact, 'homepage', 'http://github.com/eskilolsen/gdivelog2uddf')
@@ -67,7 +66,7 @@ class GDiveLogUDDF(object):
         if not text:
             return
         group = self._add(node, tag)
-        for line in text.split('\n'):
+        for line in text.split('\n\n'):
             self._add(group, 'para', text=line)
 
 
@@ -80,11 +79,13 @@ class GDiveLogUDDF(object):
         self._add(owner, 'personal', subfields={'firstname': 'Your First Name', 'lastname': 'Your Last Name'})
         equipment_group = self._add(owner, 'equipment')
         for equipment in self.db.equipment():
-            self._add(equipment_group, 'variouspieces', subfields={'name': equipment.equipment_name, 'notes': equipment.equipment_notes}, attr={'id': _equipment_ref(equipment.equipment_id)})
+            self._add(equipment_group, 'variouspieces', subfields={'name': equipment.equipment_name}, attr={'id': _equipment_ref(equipment.equipment_id)})
+            self._add_text_paragraphs(equipment_group, 'notes', equipment.equipment_notes)
         for buddy in self.db.buddies():
             buddy_group = self._add(divers, 'buddy', attr={'id': _buddy_ref(buddy.buddy_id)})
             names = buddy.buddy_name.split(' ')
             self._add(buddy_group, 'personal', subfields={'firstname': names[0], 'lastname': ' '.join(names[1:])})
+            self._add_text_paragraphs(buddy_group, 'notes', buddy.buddy_notes)
 
 
     def add_sites(self):
@@ -98,6 +99,7 @@ class GDiveLogUDDF(object):
         divesites = self._add(self.doc, 'divesite')
         for site in self.db.sites():
             site_group = self._add(divesites, 'site', subfields={'name': self.db.site_name(site.site_id)}, attr={'id': _site_ref(site.site_id)})
+            self._add_text_paragraphs(site_group, 'notes', site.site_notes)
 
 
     def add_divetrips(self):
