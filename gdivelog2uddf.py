@@ -20,6 +20,7 @@ from gdivelog.db import GDiveLogDB
 from gdivelog.db import GDiveLogDB
 from gdivelog.prefs import GDiveLogPreferences
 from gdivelog.uddf import GDiveLogUDDF
+from gdivelog.udcf import GDiveLogUDCF
 
 __author__ = "Eskil Heyn <eskil@eskil.org>"
 __maintainer__ = "Eskil Olsen <eskil@eskil.org>"
@@ -53,7 +54,7 @@ def gdivelog_to_udcf(options, args):
     """
     preferences = GDiveLogPreferences(options)
     db = GDiveLogDB(options, preferences)
-    udcf = GDiveLog.UDCF(options, preferences)
+    udcf = GDiveLogUDCF(options, preferences)
     udcf.add_dives(db, args)
     return udcf
 
