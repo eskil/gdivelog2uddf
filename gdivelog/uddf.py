@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import xml.dom.minidom
+import sys
 
 from gdivelog.utils import celcius_to_kelvin, celcius_to_fahrenheit, xml_add
 from gdivelog import SI_INF, NAME, VERSION
@@ -65,6 +66,18 @@ class GDiveLogUDDF(object):
         """
         if not text:
             return
+        if '<xml>' in text:
+            begin = text.find('<xml>')
+            end = text.find('</xml>')
+            snippet = text[begin:end+len('</xml>')]
+            try:
+                dom = xml.dom.minidom.parseString(snippet)
+                for child in  dom.firstChild.childNodes:
+                    if child.nodeType == xml.dom.Node.ELEMENT_NODE:
+                        node.appendChild(child)
+                text = text.replace(snippet, '')
+            except:
+                print >> sys.stderr, 'Error in xml in "%s"' % snippet
         group = self._add(node, tag)
         for line in text.split('\n\n'):
             self._add(group, 'para', text=line)

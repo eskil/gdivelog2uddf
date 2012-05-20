@@ -1,1 +1,24 @@
 Tool for converting a gdivelog database into UDDF and UDCF.
+
+Supports extra xml in notes. For any note field, anything in <xml>...</xml> will be removed from notes, parsed as xml and added to the subtree. Eg. for a piece of equipment,
+
+<xml>
+<nextservicedate>
+    <!-- device has to be revisioned until May 31st, 2007 (a Thursday) -->
+    <datetime>2013-04-28</datetime>
+</nextservicedate>
+<!-- part needs a yearly service -->
+<serviceinterval>365</serviceinterval>
+</xml>
+
+will let you set the service date and interval directly into the resulting XML ;
+
+<variouspieces id="eq_13">
+   <name>G600 Regs</name>
+   <nextservicedate>
+      <!-- device has to be revisioned until May 31st, 2007 (a Thursday) -->
+      <datetime>2013-04-28</datetime>
+   </nextservicedate>
+   <serviceinterval>365</serviceinterval>
+   ...
+</variouspieces>
