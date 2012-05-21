@@ -50,6 +50,24 @@ def _mix_ref(divetank):
 def _tank_ref(tank_id):
     return 'tank_%d' % tank_id
 
+
+def _volume_for_tank(preferences, tank):
+    # Attempt to haphazard the damn tank volume...
+    volume = None
+    if preferences.volume_unit == 'c':
+        if tank.tank_volume > 0 and tank.tank_wp > 0:
+            air_volume = tank.tank_volume * 28.3168466
+            if preferences.pressure_unit == 'p':
+                cylinder_pressure = tank.tank_wp * 0.0689475729
+            else:
+                cylinder_pressure = tank.tank_wp
+            volume = air_volume / cylinder_pressure
+    else:
+        if tank.tank_volume > 0:
+            volume = tank.tank_volume / 1000
+    return volume
+
+
 class GDiveLogUDDF(object):
     """
     Represent a GDivelog database as a UDDF document.
@@ -101,7 +119,7 @@ class GDiveLogUDDF(object):
             self._add(group, 'para', text=line)
 
 
-    def add_divers(self):
+    def add_divers_and_equipment(self):
         """
         Add the divelog owner and all known buddies to the UDDF document.
         """
@@ -109,27 +127,16 @@ class GDiveLogUDDF(object):
         owner = self._add(divers, 'owner', attr={'id': 'owner'})
         self._add(owner, 'personal', subfields={'firstname': 'Your First Name', 'lastname': 'Your Last Name'})
         equipment_group = self._add(owner, 'equipment')
+
         for equipment in self.db.equipment():
             piece_group = self._add(equipment_group, 'variouspieces', subfields={'name': equipment.equipment_name}, attr={'id': _equipment_ref(equipment.equipment_id)})
+
             self._add_text_paragraphs(piece_group, 'notes', equipment.equipment_notes)
         for tank in self.db.tanks():
             piece_group = self._add(equipment_group, 'tank', subfields={'name': tank.tank_name}, attr={'id': _tank_ref(tank.tank_id)})
-            # Attempt to haphazard the damn tank volume...
-            volume = None
-            if self.preferences.volume_unit == 'c':
-                if tank.tank_volume > 0 and tank.tank_wp > 0:
-                    air_volume = tank.tank_volume * 28.3168466
-                    if self.preferences.pressure_unit == 'p':
-                        cylinder_pressure = tank.tank_wp * 0.0689475729
-                    else:
-                        cylinder_pressure = tank.tank_wp
-                    volume = air_volume / cylinder_pressure
-            else:
-                if tank.tank_volume > 0:
-                    volume = tank.tank_volume / 1000
-            if volume:
-                self._add(piece_group, 'volume', volume)
+            self._add(piece_group, 'volume', _volume_for_tank(self.preferences, tank))
             self._add_text_paragraphs(piece_group, 'notes', tank.tank_notes)
+
         for buddy in self.db.buddies():
             buddy_group = self._add(divers, 'buddy', attr={'id': _buddy_ref(buddy.buddy_id)})
             names = buddy.buddy_name.split(' ')
@@ -205,6 +212,7 @@ class GDiveLogUDDF(object):
                     f_he = dive_tank.dive_tank_He/100.0
                     self._add(mix_group, 'he', f_he)
                 cache.add(ref)
+            # FIXME: enforce there's always a mix_air in it...
 
 
     def add_dive(self, repititongroup, surfaceinterval, dive):
@@ -222,6 +230,7 @@ class GDiveLogUDDF(object):
             self._add(dive_group, 'surfaceintervalbeforedive', subfields={'passedtime': surfaceinterval.days * 24 * 60 * 60 + surfaceinterval.seconds}) # .total_seconds in 2.7...
 
         if dive.dive_mintemp:
+            # FIXME: check temperature units
             self._add(dive_group, 'lowesttemperature', celcius_to_kelvin(dive.dive_mintemp))
         self._add(dive_group, 'greatestdepth', dive.dive_maxdepth)
         self._add(dive_group, 'altitude', text=0)
@@ -230,7 +239,24 @@ class GDiveLogUDDF(object):
         self._add(dive_group, 'apparatus', 'open-scuba') # gdivelog doesn't do anything else...
         self._add_text_paragraphs(dive_group, 'notes', dive.dive_notes)
 
-        # FIXME: need to add <tankdata>, see above...
+        # Stimes is a list of (starttime, mixref), so while traversing dive times for the waypoint samples, we can pop off elements as switches are made.
+        stimes = []
+        for dive_tank in self.db.dive_tanks(diveid=dive.dive_id):
+            if dive_tank.dive_tank_stime > 0 and dive_tank.dive_tank_etime > 0:
+                stimes.append((dive_tank.dive_tank_stime, _mix_ref(dive_tank)))
+            tank_group = self._add(dive_group, 'tankdata')
+            self._add(tank_group, 'link', attr={'ref': _tank_ref(dive_tank.tank_id)})
+            self._add(tank_group, 'link', attr={'ref': _mix_ref(dive_tank)})
+            tank = self.db.tank_by_id(dive_tank.tank_id)
+            self._add(tank_group, 'volume', _volume_for_tank(self.preferences, tank))
+            # FIXME: convert to pascal
+            self._add(tank_group, 'tankpressurebegin', dive_tank.dive_tank_spressure)
+            self._add(tank_group, 'tankpressureend', dive_tank.dive_tank_epressure)
+
+        if stimes:
+            stimes[0] = (0, stimes[0][1])
+        else:
+            stimes = [(0, 'mix_air')]
 
         if dive.site_id > 0:
             self._add(dive_group, 'link', attr={'ref': _site_ref(dive.site_id)})
@@ -243,10 +269,14 @@ class GDiveLogUDDF(object):
             self._add(equipment_group, 'leadquantity', dive.dive_weight)
         for equipment in self.db.equipment(diveid=dive.dive_id):
             self._add(equipment_group, 'link', attr={'ref': _equipment_ref(equipment.equipment_id)})
+
         sample_group = self._add(dive_group, 'samples')
         for sample in self.db.samples(dive.dive_id):
-            waypoint = self._add(sample_group, 'waypoint', subfields={'divetime': sample.profile_time,
-                                                                      'depth': sample.profile_depth})
+            waypoint = self._add(sample_group, 'waypoint', subfields={'divetime': sample.profile_time, 'depth': sample.profile_depth})
+            if stimes and sample.profile_time >= stimes[0][0]:
+                self._add(waypoint, 'switchmix', attr={'ref': stimes[0][1]})
+                stimes.pop(0)
+            # FIXME: check temperature units
             k = celcius_to_kelvin(sample.profile_temperature)
             if k > 0:
                 self._add(waypoint, 'temperature', k)

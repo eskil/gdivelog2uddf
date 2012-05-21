@@ -167,8 +167,11 @@ class GDiveLogDB(object):
             yield sample
 
 
-    def dive_tanks(self):
-        for dive_tank in self.session.query(GDiveLogDB.DiveTank):
+    def dive_tanks(self, diveid=None):
+        query = self.session.query(GDiveLogDB.DiveTank)
+        if diveid:
+            query = query.filter(GDiveLogDB.DiveTank.dive_id == diveid)
+        for dive_tank in query:
             yield dive_tank
 
 
@@ -176,6 +179,9 @@ class GDiveLogDB(object):
         for tank in self.session.query(GDiveLogDB.Tank):
             yield tank
 
+
+    def tank_by_id(self, tankid):
+        return self.session.query(GDiveLogDB.Tank).filter(GDiveLogDB.Tank.tank_id == tankid).one()
 
     def sites(self):
         """
