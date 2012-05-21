@@ -82,7 +82,7 @@ class GDiveLogPreferences(object):
         else:
             # So instead I do this. This is particularly
             # assy since padding can affect 0140.
-            (self.depth_unit, _, _, _, _, _) = struct.unpack('@6c', data[0:6])
+            (self.depth_unit, self.temperature_unit, self.weight_unit, self.pressure_unit, self.volume_unit, _) = struct.unpack('@6c', data[0:6])
             self.site_name_seperator = ''.join(struct.unpack('@4c', data[0140:0144])).split('\0')[0]
 
         self.site_name_seperator = self.site_name_seperator.split('\0')[0]

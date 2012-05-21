@@ -17,20 +17,38 @@ __status__ = "Production"
 def _dive_ref(dive_id):
     return 'dive_%d' % dive_id
 
+
 def _site_ref(site_id):
     return 'site_%d' % site_id
+
 
 def _buddy_ref(buddy_id):
     return 'buddy_%d' % buddy_id
 
+
 def _equipment_ref(equipment_id):
     return 'eq_%d' % equipment_id
+
 
 def _trip_ref(trip_id):
     return 'trip_%d' % trip_id
 
+
 def _repgroup_ref(repgroup_id):
     return 'rg_%d' % repgroup_id
+
+
+def _mix_ref(divetank):
+    if divetank.dive_tank_He <= 0.0:
+        if divetank.dive_tank_O2 == 21.0 or divetank.dive_tank_O2 <= 0.0:
+            return 'mix_air'
+        else:
+            return 'mix_ean%.1f' % divetank.dive_tank_O2
+    return 'mix_tx_%.1f_%.1f' % (divetank.dive_tank_O2, divetank.dive_tank_He)
+
+
+def _tank_ref(tank_id):
+    return 'tank_%d' % tank_id
 
 class GDiveLogUDDF(object):
     """
@@ -94,6 +112,24 @@ class GDiveLogUDDF(object):
         for equipment in self.db.equipment():
             piece_group = self._add(equipment_group, 'variouspieces', subfields={'name': equipment.equipment_name}, attr={'id': _equipment_ref(equipment.equipment_id)})
             self._add_text_paragraphs(piece_group, 'notes', equipment.equipment_notes)
+        for tank in self.db.tanks():
+            piece_group = self._add(equipment_group, 'tank', subfields={'name': tank.tank_name}, attr={'id': _tank_ref(tank.tank_id)})
+            # Attempt to haphazard the damn tank volume...
+            volume = None
+            if self.preferences.volume_unit == 'c':
+                if tank.tank_volume > 0 and tank.tank_wp > 0:
+                    air_volume = tank.tank_volume * 28.3168466
+                    if self.preferences.pressure_unit == 'p':
+                        cylinder_pressure = tank.tank_wp * 0.0689475729
+                    else:
+                        cylinder_pressure = tank.tank_wp
+                    volume = air_volume / cylinder_pressure
+            else:
+                if tank.tank_volume > 0:
+                    volume = tank.tank_volume / 1000
+            if volume:
+                self._add(piece_group, 'volume', volume)
+            self._add_text_paragraphs(piece_group, 'notes', tank.tank_notes)
         for buddy in self.db.buddies():
             buddy_group = self._add(divers, 'buddy', attr={'id': _buddy_ref(buddy.buddy_id)})
             names = buddy.buddy_name.split(' ')
@@ -153,20 +189,22 @@ class GDiveLogUDDF(object):
         """
         Add all known gas definitions to the UDDF document
         """
-        # FIXME: add schema defines for Tank and Dive_Tank.
-        # Loop over the specified dives, add <gasdefinitions> tag for
-        # for each mix in Dive_Tank used.
-
-        # Keep a dictionary that maps from (o2, he) to the reference
-        # tag. This way, we can later reference the gas.
-
-        # Create names ala "Air", "Oxygen", "EANx" and "TxX/Y".
-
         # Also create a dict {diveid: [(dive_tank_stime, dive_tank_id)]}.
         # This way, while creating waypoints, lookup the list and when then
         # divetime field crosses the dive_tank_stime, lookup the dive_tank_id,
         # add a <tankdata> field to the dive, and a <switchmix> field to the <waypoint>
-        pass
+        cache = set()
+        for dive_tank in self.db.dive_tanks():
+            ref = _mix_ref(dive_tank)
+            if ref not in cache:
+                mix_group = self._add(gasdefinitions, 'mix', attr={'id': ref})
+                if dive_tank.dive_tank_O2 > 0:
+                    f_o2 = dive_tank.dive_tank_O2/100.0
+                    self._add(mix_group, 'o2', f_o2)
+                if dive_tank.dive_tank_He > 0.0:
+                    f_he = dive_tank.dive_tank_He/100.0
+                    self._add(mix_group, 'he', f_he)
+                cache.add(ref)
 
 
     def add_dive(self, repititongroup, surfaceinterval, dive):

@@ -167,6 +167,16 @@ class GDiveLogDB(object):
             yield sample
 
 
+    def dive_tanks(self):
+        for dive_tank in self.session.query(GDiveLogDB.DiveTank):
+            yield dive_tank
+
+
+    def tanks(self):
+        for tank in self.session.query(GDiveLogDB.Tank):
+            yield tank
+
+
     def sites(self):
         """
         Generator to iterate across dive sites.
