@@ -41,8 +41,8 @@ def gdivelog_to_uddf(options, args):
     uddf = GDiveLogUDDF(db, options, preferences, args)
     uddf.add_divers_and_equipment()
     uddf.add_sites()
-    uddf.add_divetrips()
     uddf.add_dives()
+    uddf.add_divetrips()
     return uddf
 
 

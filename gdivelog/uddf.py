@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import xml.dom.minidom
 import sys
+import os.path
 
 from gdivelog.utils import celcius_to_kelvin, celcius_to_fahrenheit, xml_add
 from gdivelog import SI_INF, NAME, VERSION
@@ -88,6 +89,7 @@ class GDiveLogUDDF(object):
         self._add(contact, 'homepage', 'http://github.com/eskilolsen/gdivelog2uddf')
         self._add(contact, 'homepage', 'http://eskil.org/')
         self._add(generator, 'datetime', datetime.now().isoformat())
+        self._dive_trips = []
 
 
     def _add(self, node, tag, text=None, subfields={}, attr={}):
@@ -169,27 +171,20 @@ class GDiveLogUDDF(object):
         previous_divetime = datetime.min
         trip_counter = 1
 
-        for dive in self.db.dives(numbers=self.args):
-            # Compute the SI and start a new trip if > threshold
-            divetime = datetime.strptime(dive.dive_datetime, '%Y-%m-%d %H:%M:%S')
-            surfaceinterval = divetime - previous_divetime
-
-            if surfaceinterval > timedelta(days=self.options.trip_si_threshold):
-                trip = self._add(divetrips, 'trip', attr={'id': _trip_ref(trip_counter)})
-                trip_counter += 1
-                self._add(trip, 'name', self.db.site_name(dive.site_id))
-                trippart = self._add(trip, 'trippart')
-                relateddives = self._add(trippart, 'relateddives')
-                # FIXME: http://www.streit.cc/extern/uddf_v300/en/trippart.html others fields to add ?
-
-            self._add(relateddives, 'link', attr={'ref': _dive_ref(dive.dive_id)})
-            previous_divetime = divetime
-
-        # Add 1 initial trip.
-        # Trip names are the site of the first dive in the trip (keep it simple...)
-        # For each dive, if the divetime delta is LT options.tripthreshold, add dive to trip,
-        # if not, new trip...
-
+        for trip_id, dive_ids in enumerate(self._dive_trips):
+            trip = self._add(divetrips, 'trip', attr={'id': _trip_ref(trip_id)})
+            first_dive = self.db.dive_by_id(dive_ids[0])
+            last_dive = self.db.dive_by_id(dive_ids[-1])
+            first_site = self.db.site_name(first_dive.site_id)
+            last_site = self.db.site_name(last_dive.site_id)
+            # FIXME: really should use all the dives
+            site_name = os.path.commonprefix([first_site, last_site])
+            self._add(trip, 'name', site_name)
+            trippart = self._add(trip, 'trippart')
+            self._add(trippart, 'dateoftrip', attr={'startdate': datetime.strptime(first_dive.dive_datetime, '%Y-%m-%d %H:%M:%S').date().isoformat(), 'enddate': datetime.strptime(last_dive.dive_datetime, '%Y-%m-%d %H:%M:%S').date().isoformat()})
+            relateddives = self._add(trippart, 'relateddives')
+            for dive_id in dive_ids:
+                self._add(relateddives, 'link', attr={'ref': dive_id})
 
 
     def add_gasdefinitions(self, gasdefinitions, dive):
@@ -221,13 +216,20 @@ class GDiveLogUDDF(object):
         """
         divetime = datetime.strptime(dive.dive_datetime, '%Y-%m-%d %H:%M:%S')
         dive_group = self._add(repititongroup, 'dive', attr={'id': _dive_ref(dive.dive_id)})
-        self._add(dive_group, 'dive_number', text=dive.dive_number)
-        self._add(dive_group, 'tripmembership')
-        self._add(dive_group, 'datetime', divetime.isoformat())
+        info_group = self._add(dive_group, 'informationbeforedive')
+        self._add(info_group, 'dive_number', text=dive.dive_number)
+        if self.options.trip_si_threshold:
+            if surfaceinterval > timedelta(days=self.options.trip_si_threshold):
+                self._dive_trips.append([dive.dive_id])
+            else:
+                self._dive_trips[-1].append(dive.dive_id)
+
+        self._add(info_group, 'datetime', divetime.isoformat())
         if surfaceinterval > SI_INF:
-            self._add(dive_group, 'surfaceintervalbeforedive', subfields={'infinity': None})
+            self._add(info_group, 'surfaceintervalbeforedive', subfields={'infinity': None})
         else:
-            self._add(dive_group, 'surfaceintervalbeforedive', subfields={'passedtime': surfaceinterval.days * 24 * 60 * 60 + surfaceinterval.seconds}) # .total_seconds in 2.7...
+            self._add(info_group, 'surfaceintervalbeforedive', subfields={'passedtime': surfaceinterval.days * 24 * 60 * 60 + surfaceinterval.seconds}) # .total_seconds in 2.7...
+        self._add(info_group, 'apparatus', 'open-scuba') # gdivelog doesn't do anything else...
 
         if dive.dive_mintemp:
             # FIXME: check temperature units
@@ -236,7 +238,6 @@ class GDiveLogUDDF(object):
         self._add(dive_group, 'altitude', text=0)
         self._add(dive_group, 'density', text=1030)
         self._add(dive_group, 'duration', dive.dive_duration)
-        self._add(dive_group, 'apparatus', 'open-scuba') # gdivelog doesn't do anything else...
         self._add_text_paragraphs(dive_group, 'notes', dive.dive_notes)
 
         # Stimes is a list of (starttime, mixref), so while traversing dive times for the waypoint samples, we can pop off elements as switches are made.

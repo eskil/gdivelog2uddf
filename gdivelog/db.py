@@ -134,6 +134,11 @@ class GDiveLogDB(object):
         for dive in query:
             yield dive
 
+
+    def dive_by_id(self, diveid):
+        return self.session.query(GDiveLogDB.Dive).filter(GDiveLogDB.Dive.dive_id == diveid).one()
+
+
     def equipment(self, diveid=None):
         """
         Generator to iterate across equipment
@@ -182,6 +187,7 @@ class GDiveLogDB(object):
 
     def tank_by_id(self, tankid):
         return self.session.query(GDiveLogDB.Tank).filter(GDiveLogDB.Tank.tank_id == tankid).one()
+
 
     def sites(self):
         """
