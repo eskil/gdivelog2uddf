@@ -122,14 +122,21 @@ class GDiveLogDB(object):
         dive_tank_epressure = Column(Float)
 
 
-    def dives(self, numbers=[]):
+    def dives(self, numbers=None, ids=None, orderby='number'):
         """
         Generator to iterate across dives in the database. Optionally only iterate across the ones listed in numbers.
         """
-        if numbers == []:
-            query = self.session.query(GDiveLogDB.Dive).order_by(GDiveLogDB.Dive.dive_number.asc())
-        else:
+        if numbers:
             query = self.session.query(GDiveLogDB.Dive).filter(GDiveLogDB.Dive.dive_number.in_(numbers)).order_by(GDiveLogDB.Dive.dive_number.asc())
+        elif ids:
+            query = self.session.query(GDiveLogDB.Dive).filter(GDiveLogDB.Dive.dive_id.in_(ids)).order_by(GDiveLogDB.Dive.dive_number.asc())
+        else:
+            query = self.session.query(GDiveLogDB.Dive).order_by(GDiveLogDB.Dive.dive_number.asc())
+
+        if orderby == 'number':
+            query = query.order_by(GDiveLogDB.Dive.dive_number.asc())
+        elif orderby == 'datetime':
+            query = query.order_by(GDiveLogDB.Dive.dive_datetime.asc())
 
         for dive in query:
             yield dive

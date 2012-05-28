@@ -173,18 +173,16 @@ class GDiveLogUDDF(object):
 
         for trip_id, dive_ids in enumerate(self._dive_trips):
             trip = self._add(divetrips, 'trip', attr={'id': _trip_ref(trip_id)})
-            first_dive = self.db.dive_by_id(dive_ids[0])
-            last_dive = self.db.dive_by_id(dive_ids[-1])
-            first_site = self.db.site_name(first_dive.site_id)
-            last_site = self.db.site_name(last_dive.site_id)
-            # FIXME: really should use all the dives
-            site_name = os.path.commonprefix([first_site, last_site])
+            dives = [dive for dive in self.db.dives(ids=dive_ids, orderby='datetime')]
+            first_dive = dives[0]
+            last_dive = dives[-1]
+            site_name = os.path.commonprefix([self.db.site_name(dive.site_id) for dive in dives])
             self._add(trip, 'name', site_name)
             trippart = self._add(trip, 'trippart')
             self._add(trippart, 'dateoftrip', attr={'startdate': datetime.strptime(first_dive.dive_datetime, '%Y-%m-%d %H:%M:%S').date().isoformat(), 'enddate': datetime.strptime(last_dive.dive_datetime, '%Y-%m-%d %H:%M:%S').date().isoformat()})
             relateddives = self._add(trippart, 'relateddives')
             for dive_id in dive_ids:
-                self._add(relateddives, 'link', attr={'ref': dive_id})
+                self._add(relateddives, 'link', attr={'ref': _dive_ref(dive_id)})
 
 
     def add_gasdefinitions(self, gasdefinitions, dive):
@@ -293,7 +291,7 @@ class GDiveLogUDDF(object):
         previous_divetime = datetime.min
         repititiongroup_counter = 1
 
-        for dive in self.db.dives(numbers=self.args):
+        for dive in self.db.dives(numbers=self.args, orderby='number'):
             # Compute the SI and start a new group if INF
             divetime = datetime.strptime(dive.dive_datetime, '%Y-%m-%d %H:%M:%S')
             surfaceinterval = divetime - previous_divetime
