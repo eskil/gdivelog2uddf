@@ -79,16 +79,11 @@ class GDiveLogUDDF(object):
         self.options = options
         self.preferences = preferences
         self.args = args
-        self._tops = []
-        self.docs = []
         self._start_new_doc()
-        self._add_divers_and_equipment()
-        self._add_sites()
-        self._add_dives()
 
     def _start_new_doc(self):
-        self._top = xml.dom.minidom.Document()
-        self.doc = self._add(self._top, 'uddf',
+        self.top = xml.dom.minidom.Document()
+        self.doc = self._add(self.top, 'uddf',
                              attr={'version': '3.0.0',
                                    'type': 'converter'}
                              )
@@ -101,11 +96,13 @@ class GDiveLogUDDF(object):
         self._add(contact, 'homepage', 'http://github.com/eskil/gdivelog2uddf')
         self._add(contact, 'homepage', 'http://eskil.org/')
         self._add(generator, 'datetime', datetime.now().isoformat())
-        self.docs.append(self._top)
+        # Instead, like dive_trips, we should track the eq and sites needed per segment.
+        self._add_divers_and_equipment()
+        self._add_sites()
 
     def _add(self, node, tag, text=None, subfields={}, attr={}):
         '''Helper function to add tag to node via xml_add'''
-        return xml_add(self._top, node, tag, text=text, subfields=subfields, attr=attr)
+        return xml_add(self.top, node, tag, text=text, subfields=subfields, attr=attr)
 
 
     def _add_text_paragraphs(self, node, tag, text):
@@ -294,7 +291,7 @@ class GDiveLogUDDF(object):
                 self._add(waypoint, 'temperature', k)
 
 
-    def _add_dives(self):
+    def iter_dives(self):
         """
         Add all known dives to the UDDF document. The is the main
         place to iterate across all dives and accumulate info.
@@ -306,7 +303,7 @@ class GDiveLogUDDF(object):
 
         dive_trips = []
         segment_size = 0
-        for dive in self.db.dives(numbers=self.args, orderby='number'):
+        for dive in self.db.dives(numbers=self.args, orderby='datetime'):
             # Compute the SI and start a new group if INF
             divetime = datetime.strptime(dive.dive_datetime, '%Y-%m-%d %H:%M:%S')
             surfaceinterval = divetime - previous_divetime
@@ -321,18 +318,21 @@ class GDiveLogUDDF(object):
             previous_divetime = divetime
 
             segment_size += 1
-            print 'SEGMENTS', segment_size, self.options.segment_size, surfaceinterval, SI_INF
+            #print 'SEGMENTS', segment_size, self.options.segment_size, surfaceinterval, SI_INF
             if self.options.segment_size:
                 if surfaceinterval >= SI_INF and segment_size > int(self.options.segment_size):
                     self._add_divetrips(dive_trips)
-                    self._start_new_doc()
+                    yield self.top
+
                     # Reset everything
+                    self._start_new_doc()
                     gasdefinitions = self._add(self.doc, 'gasdefinitions')
                     profiledata = self._add(self.doc, 'profiledata')
                     segment_size = 0
                     dive_trips = []
 
         self._add_divetrips(dive_trips)
+        yield self.top
 
 
 

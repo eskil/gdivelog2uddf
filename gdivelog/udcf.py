@@ -28,20 +28,18 @@ class GDiveLogUDCF(object):
         self.top = xml.dom.minidom.Document()
         # Put in the <generator> header.
         self.doc = self._add(self.top, 'profile', attr={'udcf': 1})
-        self.docs = [self.doc]
         if self.preferences.depth_unit == 'm':
             self._add(self.doc, 'units', text='Metric')
         else:
             self._add(self.doc, 'units', text='Imperial')
         self._add(self.doc, 'device', subfields={'vendor': NAME, 'model': 'udcf', 'version': VERSION})
-        self._add_dives()
 
     def _add(self, node, tag, text=None, subfields={}, attr={}):
         '''Helper function to add tag to node via xml_add'''
         return xml_add(self.top, node, tag, text=text, subfields=subfields, attr=attr)
 
 
-    def _add_dives(self):
+    def iter_dives(self):
         """
         Add all known dives to the UDCF document.
         """
@@ -90,5 +88,6 @@ class GDiveLogUDCF(object):
 
             previous_divetime = divetime
 
+        yield self.top
 
 

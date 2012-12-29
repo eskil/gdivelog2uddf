@@ -26,8 +26,17 @@ __author__ = "Eskil Heyn <eskil@eskil.org>"
 __maintainer__ = "Eskil Olsen <eskil@eskil.org>"
 __copyright__ = "Copyright 2011"
 __license__ = "Public Domain"
-__version__ = "1.0"
+__version__ = "3.2.0-5"
 __status__ = "Production"
+
+
+def sequence_file_name(fname, idx):
+    """Inject .N after the last dot"""
+    path = fname.split('.')
+    if len(path) > 1:
+        return '.'.join(path[:-1] + ['%d' % idx, path[-1]])
+    return fname + '.%d' % idx
+
 
 
 def main(options, args):
@@ -39,12 +48,9 @@ def main(options, args):
     else:
         xml = GDiveLogUDDF(db, options, preferences, args)
 
-    for idx, doc in enumerate(xml.docs):
+    for idx, doc in enumerate(xml.iter_dives()):
         if options.output:
-            if len(xml.docs) > 1:
-                out = open(options.output + '.%d' % idx, 'w')
-            else:
-                out = open(options.output, 'w')
+            out = open(sequence_file_name(options.output, idx), 'w')
         else:
             out = sys.stdout
 
