@@ -42,7 +42,6 @@ def gdivelog_to_uddf(options, args):
     uddf.add_divers_and_equipment()
     uddf.add_sites()
     uddf.add_dives()
-    uddf.add_divetrips()
     return uddf
 
 
@@ -65,15 +64,19 @@ def main(options, args):
     else:
         xml = gdivelog_to_uddf(options, args)
 
-    if options.output:
-        out = open(options.output, 'w')
-    else:
-        out = sys.stdout
+    for idx, doc in enumerate(xml.docs):
+        if options.output:
+            if len(xml.docs) > 1:
+                out = open(options.output + '.%d' % idx, 'w')
+            else:
+                out = open(options.output, 'w')
+        else:
+            out = sys.stdout
 
-    if options.prettyprint:
-        out.write(xml.doc.toprettyxml(encoding='utf-8'))
-    else:
-        out.write(xml.doc.toxml('utf-8'))
+        if options.prettyprint:
+            out.write(doc.toprettyxml(encoding='utf-8'))
+        else:
+            out.write(doc.toxml('utf-8'))
 
 
 if __name__ == '__main__':
@@ -88,7 +91,7 @@ if __name__ == '__main__':
     parser.add_option('-u', '--udcf', action='store_true', dest='udcf', default=False, help='dump dives as udcf')
     parser.add_option('-o', '--output', dest='output', default=None, help='Output filename. Must be set if using --segment')
     parser.add_option('--trip-threshold', dest='trip_si_threshold', type='int', default=None, help='Dives within this number of days are grouped into 1 trip')
-    #parser.add_option('--segment', dest='segment_size', default=None, help='To reduce memory usage, batch output into files with this number of dives per segment (number will be varied since trips will not be split')
+    parser.add_option('--segment', dest='segment_size', default=None, help='To reduce memory usage, batch output into files with this number of dives per segment (number will be varied since trips will not be split')
 
     (options, args) = parser.parse_args()
 

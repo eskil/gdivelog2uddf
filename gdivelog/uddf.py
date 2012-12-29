@@ -79,22 +79,30 @@ class GDiveLogUDDF(object):
         self.options = options
         self.preferences = preferences
         self.args = args
-        self.top = xml.dom.minidom.Document()
-        # Put in the <generator> header.
-        self.doc = self._add(self.top, 'uddf', attr={'version': '3.0.0',
-                                                     'type': 'converter'})
-        generator = self._add(self.doc, 'generator', subfields={'name': NAME, 'version': VERSION, 'type': 'logbook'})
+        self._tops = []
+        self.docs = []
+        self._start_new_doc()
+
+    def _start_new_doc(self):
+        self._top = xml.dom.minidom.Document()
+        self.doc = self._add(self._top, 'uddf',
+                             attr={'version': '3.0.0',
+                                   'type': 'converter'}
+                             )
+        generator = self._add(self.doc, 'generator', subfields={'name': NAME,
+                                                                'version': VERSION,
+                                                                'type': 'logbook'}
+                              )
         manufacturer = self._add(generator, 'manufacturer', subfields={'name': 'Eskil Heyn Olsen'})
         contact = self._add(manufacturer, 'contact')
         self._add(contact, 'homepage', 'http://github.com/eskil/gdivelog2uddf')
         self._add(contact, 'homepage', 'http://eskil.org/')
         self._add(generator, 'datetime', datetime.now().isoformat())
-        self._dive_trips = []
-
+        self.docs.append(self._top)
 
     def _add(self, node, tag, text=None, subfields={}, attr={}):
         '''Helper function to add tag to node via xml_add'''
-        return xml_add(self.top, node, tag, text=text, subfields=subfields, attr=attr)
+        return xml_add(self._top, node, tag, text=text, subfields=subfields, attr=attr)
 
 
     def _add_text_paragraphs(self, node, tag, text):
@@ -160,7 +168,7 @@ class GDiveLogUDDF(object):
             self._add_text_paragraphs(site_group, 'notes', site.site_notes)
 
 
-    def add_divetrips(self):
+    def _add_divetrips(self, dive_trips):
         """
         Add all divetrip to the UDDF document
         """
@@ -171,7 +179,7 @@ class GDiveLogUDDF(object):
         previous_divetime = datetime.min
         trip_counter = 1
 
-        for trip_id, dive_ids in enumerate(self._dive_trips):
+        for trip_id, dive_ids in enumerate(dive_trips):
             trip = self._add(divetrips, 'trip', attr={'id': _trip_ref(trip_id)})
             dives = [dive for dive in self.db.dives(ids=dive_ids, orderby='datetime')]
             first_dive = dives[0]
@@ -208,7 +216,7 @@ class GDiveLogUDDF(object):
             # FIXME: enforce there's always a mix_air in it...
 
 
-    def add_dive(self, repititongroup, surfaceinterval, dive):
+    def add_dive(self, repititongroup, surfaceinterval, dive, dive_trips):
         """
         This adds a single <dive> tag to the <repetitiongroup> given.
         """
@@ -219,9 +227,9 @@ class GDiveLogUDDF(object):
         self._add(pre_info_group, 'dive_number', text=dive.dive_number)
         if self.options.trip_si_threshold:
             if surfaceinterval > timedelta(days=self.options.trip_si_threshold):
-                self._dive_trips.append([dive.dive_id])
+                dive_trips.append([dive.dive_id])
             else:
-                self._dive_trips[-1].append(dive.dive_id)
+                dive_trips[-1].append(dive.dive_id)
 
         self._add(pre_info_group, 'datetime', divetime.isoformat())
         if surfaceinterval > SI_INF:
@@ -293,6 +301,8 @@ class GDiveLogUDDF(object):
         previous_divetime = datetime.min
         repititiongroup_counter = 1
 
+        dive_trips = []
+        segment_size = 0
         for dive in self.db.dives(numbers=self.args, orderby='number'):
             # Compute the SI and start a new group if INF
             divetime = datetime.strptime(dive.dive_datetime, '%Y-%m-%d %H:%M:%S')
@@ -303,9 +313,25 @@ class GDiveLogUDDF(object):
                 repititiongroup_counter += 1
 
             self.add_gasdefinitions(gasdefinitions, dive)
-            self.add_dive(repititongroup, surfaceinterval, dive)
+            self.add_dive(repititongroup, surfaceinterval, dive, dive_trips)
 
             previous_divetime = divetime
+
+            segment_size += 1
+            print 'SEGMENTS', segment_size, self.options.segment_size, surfaceinterval, SI_INF
+            if surfaceinterval >= SI_INF and segment_size > int(self.options.segment_size):
+                self._add_divetrips(dive_trips)
+                self._start_new_doc()
+                # Reset everything
+                gasdefinitions = self._add(self.doc, 'gasdefinitions')
+                profiledata = self._add(self.doc, 'profiledata')
+                segment_size = 0
+                dive_trips = []
+
+        self._add_divetrips(dive_trips)
+
+
+
 
 
 
