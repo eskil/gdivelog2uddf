@@ -30,39 +30,14 @@ __version__ = "1.0"
 __status__ = "Production"
 
 
-def gdivelog_to_uddf(options, args):
-    """
-    Convert a GDivelog db into a UDDF document.
-    Returns;
-       a GDiveLogUDDF object which has a doc property that is the xml.
-    """
-    preferences = GDiveLogPreferences(options)
-    db = GDiveLogDB(options, preferences)
-    uddf = GDiveLogUDDF(db, options, preferences, args)
-    uddf.add_divers_and_equipment()
-    uddf.add_sites()
-    uddf.add_dives()
-    return uddf
-
-
-def gdivelog_to_udcf(options, args):
-    """
-    Convert a GDivelog db into a UDCF document.
-    Returns;
-       a GDiveLogUDCF object which has a doc property that is the xml.
-    """
-    preferences = GDiveLogPreferences(options)
-    db = GDiveLogDB(options, preferences)
-    udcf = GDiveLogUDCF(options, preferences)
-    udcf.add_dives(db, args)
-    return udcf
-
-
 def main(options, args):
+    preferences = GDiveLogPreferences(options)
+    db = GDiveLogDB(options, preferences)
+
     if options.udcf:
-        xml = gdivelog_to_udcf(options, args)
+        xml = GDiveLogUDCF(db, options, preferences, args)
     else:
-        xml = gdivelog_to_uddf(options, args)
+        xml = GDiveLogUDDF(db, options, preferences, args)
 
     for idx, doc in enumerate(xml.docs):
         if options.output:

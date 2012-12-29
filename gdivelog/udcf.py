@@ -20,32 +20,35 @@ class GDiveLogUDCF(object):
     Note: UDCF is discontinued, so don't bother putting too much effort into this thing.
     """
 
-    def __init__(self, options, preferences):
+    def __init__(self, divelog, options, preferences, args):
+        self.divelog = divelog
         self.options = options
         self.preferences = preferences
+        self.args = args
         self.top = xml.dom.minidom.Document()
         # Put in the <generator> header.
         self.doc = self._add(self.top, 'profile', attr={'udcf': 1})
+        self.docs = [self.doc]
         if self.preferences.depth_unit == 'm':
             self._add(self.doc, 'units', text='Metric')
         else:
             self._add(self.doc, 'units', text='Imperial')
         self._add(self.doc, 'device', subfields={'vendor': NAME, 'model': 'udcf', 'version': VERSION})
-
+        self._add_dives()
 
     def _add(self, node, tag, text=None, subfields={}, attr={}):
         '''Helper function to add tag to node via xml_add'''
         return xml_add(self.top, node, tag, text=text, subfields=subfields, attr=attr)
 
 
-    def add_dives(self, divelog, args):
+    def _add_dives(self):
         """
         Add all known dives to the UDCF document.
         """
         previous_divetime = datetime.min
         group = self._add(self.doc, 'repgroup')
 
-        for dive in divelog.dives(numbers=args):
+        for dive in self.divelog.dives(numbers=self.args):
             # Compute the SI and start a new group if INF
             divetime = datetime.strptime(dive.dive_datetime, '%Y-%m-%d %H:%M:%S')
             surfaceinterval = divetime - previous_divetime
@@ -73,16 +76,19 @@ class GDiveLogUDCF(object):
             tank_group = self._add(mix_group, 'tank', subfields={'tankvolume': 10, 'pstart': 250, 'pend': 30})
 
             if dive.site_id > 0:
-                self._add(dive_group, 'place', text=divelog.site_name(dive.site_id))
+                self._add(dive_group, 'place', text=self.divelog.site_name(dive.site_id))
 
             self._add(dive_group, 'timedepthmode')
             sample_group = self._add(dive_group, 'samples', subfields={'switch': 1})
             self._add(sample_group, 't', text=0)
             self._add(sample_group, 'd', text=0)
-            for sample in divelog.samples(dive.dive_id):
+            for sample in self.divelog.samples(dive.dive_id):
                 self._add(sample_group, 't', text=sample.profile_time)
                 self._add(sample_group, 'd', text=sample.profile_depth)
             self._add(sample_group, 't')
             self._add(sample_group, 'd', text=0)
 
             previous_divetime = divetime
+
+
+

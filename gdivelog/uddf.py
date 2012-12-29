@@ -82,6 +82,9 @@ class GDiveLogUDDF(object):
         self._tops = []
         self.docs = []
         self._start_new_doc()
+        self._add_divers_and_equipment()
+        self._add_sites()
+        self._add_dives()
 
     def _start_new_doc(self):
         self._top = xml.dom.minidom.Document()
@@ -129,7 +132,7 @@ class GDiveLogUDDF(object):
             self._add(group, 'para', text=line)
 
 
-    def add_divers_and_equipment(self):
+    def _add_divers_and_equipment(self):
         """
         Add the divelog owner and all known buddies to the UDDF document.
         """
@@ -154,7 +157,7 @@ class GDiveLogUDDF(object):
             self._add_text_paragraphs(buddy_group, 'notes', buddy.buddy_notes)
 
 
-    def add_sites(self):
+    def _add_sites(self):
         """
         Add all known sites to the UDDF document.
 
@@ -193,7 +196,7 @@ class GDiveLogUDDF(object):
                 self._add(relateddives, 'link', attr={'ref': _dive_ref(dive_id)})
 
 
-    def add_gasdefinitions(self, gasdefinitions, dive):
+    def _add_gasdefinitions(self, gasdefinitions, dive):
         """
         Add all known gas definitions to the UDDF document
         """
@@ -216,7 +219,7 @@ class GDiveLogUDDF(object):
             # FIXME: enforce there's always a mix_air in it...
 
 
-    def add_dive(self, repititongroup, surfaceinterval, dive, dive_trips):
+    def _add_dive(self, repititongroup, surfaceinterval, dive, dive_trips):
         """
         This adds a single <dive> tag to the <repetitiongroup> given.
         """
@@ -291,7 +294,7 @@ class GDiveLogUDDF(object):
                 self._add(waypoint, 'temperature', k)
 
 
-    def add_dives(self):
+    def _add_dives(self):
         """
         Add all known dives to the UDDF document. The is the main
         place to iterate across all dives and accumulate info.
@@ -312,21 +315,22 @@ class GDiveLogUDDF(object):
                 repititongroup = self._add(profiledata, 'repetitiongroup', attr={'id': _repgroup_ref(repititiongroup_counter)})
                 repititiongroup_counter += 1
 
-            self.add_gasdefinitions(gasdefinitions, dive)
-            self.add_dive(repititongroup, surfaceinterval, dive, dive_trips)
+            self._add_gasdefinitions(gasdefinitions, dive)
+            self._add_dive(repititongroup, surfaceinterval, dive, dive_trips)
 
             previous_divetime = divetime
 
             segment_size += 1
             print 'SEGMENTS', segment_size, self.options.segment_size, surfaceinterval, SI_INF
-            if surfaceinterval >= SI_INF and segment_size > int(self.options.segment_size):
-                self._add_divetrips(dive_trips)
-                self._start_new_doc()
-                # Reset everything
-                gasdefinitions = self._add(self.doc, 'gasdefinitions')
-                profiledata = self._add(self.doc, 'profiledata')
-                segment_size = 0
-                dive_trips = []
+            if self.options.segment_size:
+                if surfaceinterval >= SI_INF and segment_size > int(self.options.segment_size):
+                    self._add_divetrips(dive_trips)
+                    self._start_new_doc()
+                    # Reset everything
+                    gasdefinitions = self._add(self.doc, 'gasdefinitions')
+                    profiledata = self._add(self.doc, 'profiledata')
+                    segment_size = 0
+                    dive_trips = []
 
         self._add_divetrips(dive_trips)
 
