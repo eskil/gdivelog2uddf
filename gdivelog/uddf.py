@@ -251,7 +251,7 @@ class GDiveLogUDDF(object):
         # Stimes is a list of (starttime, mixref), so while traversing dive times for the waypoint samples, we can pop off elements as switches are made.
         stimes = []
         for dive_tank in self.db.dive_tanks(diveid=dive.dive_id):
-            if dive_tank.dive_tank_stime > 0 and dive_tank.dive_tank_etime > 0:
+            if dive_tank.dive_tank_stime >= 0 and dive_tank.dive_tank_etime > 0:
                 stimes.append((dive_tank.dive_tank_stime, _mix_ref(dive_tank)))
             tank_group = self._add(dive_group, 'tankdata')
             self._add(tank_group, 'link', attr={'ref': _tank_ref(dive_tank.tank_id)})
