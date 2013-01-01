@@ -248,11 +248,11 @@ class GDiveLogUDDF(object):
         self._add(post_info_group, 'diveduration', dive.dive_duration)
         self._add(post_info_group, 'greatestdepth', dive.dive_maxdepth)
 
-        # Stimes is a list of (starttime, mixref), so while traversing dive times for the waypoint samples, we can pop off elements as switches are made.
-        stimes = []
+        # mix_switch_times is a list of (starttime, mixref), so while traversing dive times for the waypoint samples, we can pop off elements as switches are made.
+        mix_switch_times = []
         for dive_tank in self.db.dive_tanks(diveid=dive.dive_id):
             if dive_tank.dive_tank_stime >= 0 and dive_tank.dive_tank_etime > 0:
-                stimes.append((dive_tank.dive_tank_stime, _mix_ref(dive_tank)))
+                mix_switch_times.append((dive_tank.dive_tank_stime, _mix_ref(dive_tank)))
             tank_group = self._add(dive_group, 'tankdata')
             self._add(tank_group, 'link', attr={'ref': _tank_ref(dive_tank.tank_id)})
             self._add(tank_group, 'link', attr={'ref': _mix_ref(dive_tank)})
@@ -262,10 +262,10 @@ class GDiveLogUDDF(object):
             self._add(tank_group, 'tankpressurebegin', dive_tank.dive_tank_spressure)
             self._add(tank_group, 'tankpressureend', dive_tank.dive_tank_epressure)
 
-        if stimes:
-            stimes[0] = (0, stimes[0][1])
+        if mix_switch_times:
+            mix_switch_times[0] = (0, mix_switch_times[0][1])
         else:
-            stimes = [(0, 'mix_air')]
+            mix_switch_times = [(0, 'mix_air')]
 
         if dive.site_id > 0:
             self._add(dive_group, 'link', attr={'ref': _site_ref(dive.site_id)})
@@ -282,9 +282,9 @@ class GDiveLogUDDF(object):
         sample_group = self._add(dive_group, 'samples')
         for sample in self.db.samples(dive.dive_id):
             waypoint = self._add(sample_group, 'waypoint', subfields={'divetime': sample.profile_time, 'depth': sample.profile_depth})
-            if stimes and sample.profile_time >= stimes[0][0]:
-                self._add(waypoint, 'switchmix', attr={'ref': stimes[0][1]})
-                stimes.pop(0)
+            if mix_switch_times and sample.profile_time >= mix_switch_times[0][0]:
+                self._add(waypoint, 'switchmix', attr={'ref': mix_switch_times[0][1]})
+                mix_switch_times.pop(0)
             # FIXME: check temperature units
             k = celcius_to_kelvin(sample.profile_temperature)
             if k > 0:
