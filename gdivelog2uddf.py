@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     parser.add_option('-p', '--pretty-print', '--pretty', '--prettyprint', action='store_true', dest='prettyprint', default=False, help='pretty print xml')
     parser.add_option('-v', '--verbose', action='store_true', dest='verbose', default=False,  help='print status messages to stdout')
-    parser.add_option('-u', '--udcf', action='store_true', dest='udcf', default=False, help='dump dives as udcf')
+    parser.add_option('--udcf', action='store_true', dest='udcf', default=False, help='dump dives as udcf')
     parser.add_option('-o', '--output', dest='output', default=None, help='Output filename. Must be set if using --segment')
     parser.add_option('--trip-threshold', dest='trip_si_threshold', type='int', default=None, help='Dives within this number of days are grouped into 1 trip')
     parser.add_option('--segment', dest='segment_size', default=None, help='To reduce memory usage, batch output into files with this number of dives per segment (number will be varied since trips will not be split')

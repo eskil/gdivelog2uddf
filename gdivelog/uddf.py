@@ -213,7 +213,13 @@ class GDiveLogUDDF(object):
                     f_he = dive_tank.dive_tank_He/100.0
                     self._add(mix_group, 'he', f_he)
                 cache.add(ref)
-            # FIXME: enforce there's always a mix_air in it...
+
+        # http://www.streit.cc/extern/uddf_v320/en/waypoint.html. First waypoint must have a
+        # switchmix, so if we have no switchtimes, add a mix_air switch. So we have to ensure
+        # there's a mix_air in the uddf.
+        if not cache or not 'mix_air' in cache:
+            mix_group = self._add(gasdefinitions, 'mix', attr={'id': 'mix_air'})
+            self._add(mix_group, 'o2', 0.209)
 
 
     def _add_dive(self, repititongroup, surfaceinterval, dive, dive_trips):
@@ -261,10 +267,14 @@ class GDiveLogUDDF(object):
             # FIXME: convert to pascal
             self._add(tank_group, 'tankpressurebegin', dive_tank.dive_tank_spressure)
             self._add(tank_group, 'tankpressureend', dive_tank.dive_tank_epressure)
+        # Ensure they are sorted by divetime.
+        mix_switch_times = sorted(mix_switch_times, key=lambda e: e[0])
 
         if mix_switch_times:
             mix_switch_times[0] = (0, mix_switch_times[0][1])
         else:
+            # http://www.streit.cc/extern/uddf_v320/en/waypoint.html. First waypoint must have a
+            # switchmix, so if we have no switchtimes, add a mix_air switch.
             mix_switch_times = [(0, 'mix_air')]
 
         if dive.site_id > 0:
